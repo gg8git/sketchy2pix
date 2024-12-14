@@ -25,15 +25,17 @@ class CFGDenoiser(nn.Module):
         super().__init__()
         self.inner_model = model
 
-    def forward(self, z, sigma, cond, uncond, text_cfg_scale, image_cfg_scale):
+    def forward(self, z, sigma, cond, uncond, text_cfg_scale, image_cfg_scale, sketch_cfg_scale):
         cfg_z = einops.repeat(z, "1 ... -> n ...", n=3)
         cfg_sigma = einops.repeat(sigma, "1 ... -> n ...", n=3)
+        input_cat = torch.cat([cond["c_concat"][0], cond["c_concat"][0], cond["c_concat"][0], uncond["c_concat"][0]])
+        sketch_cat = torch.cat([cond["c_sketch"][0], cond["c_sketch"][0], uncond["c_sketch"][0], uncond["c_sketch"][0]])
         cfg_cond = {
-            "c_crossattn": [torch.cat([cond["c_crossattn"][0], uncond["c_crossattn"][0], uncond["c_crossattn"][0]])],
-            "c_concat": [torch.cat([cond["c_concat"][0], cond["c_concat"][0], uncond["c_concat"][0]])],
+            "c_crossattn": [torch.cat([cond["c_crossattn"][0], uncond["c_crossattn"][0], uncond["c_crossattn"][0], uncond["c_crossattn"][0]])],
+            "c_concat": [torch.cat([input_cat, sketch_cat], dim=1)],
         }
-        out_cond, out_img_cond, out_uncond = self.inner_model(cfg_z, cfg_sigma, cond=cfg_cond).chunk(3)
-        return out_uncond + text_cfg_scale * (out_cond - out_img_cond) + image_cfg_scale * (out_img_cond - out_uncond)
+        out_cond, out_sketch_cond, out_img_cond, out_uncond = self.inner_model(cfg_z, cfg_sigma, cond=cfg_cond).chunk(4)
+        return out_uncond + text_cfg_scale * (out_cond - out_img_cond) + sketch_cfg_scale * (out_img_cond - out_sketch_cond) + image_cfg_scale * (out_sketch_cond - out_uncond)
 
 
 def load_model_from_config(config, ckpt, vae_ckpt=None, verbose=False):
@@ -68,10 +70,12 @@ def main():
     parser.add_argument("--ckpt", default="checkpoints/instruct-pix2pix-00-22000.ckpt", type=str)
     parser.add_argument("--vae-ckpt", default=None, type=str)
     parser.add_argument("--input", required=True, type=str)
+    parser.add_argument("--sketch", required=True, type=str)
     parser.add_argument("--output", required=True, type=str)
     parser.add_argument("--edit", required=True, type=str)
-    parser.add_argument("--cfg-text", default=7.5, type=float)
-    parser.add_argument("--cfg-image", default=1.5, type=float)
+    parser.add_argument("--cfg-text", default=12, type=float)
+    parser.add_argument("--cfg-image", default=1, type=float)
+    parser.add_argument("--cfg-sketch", default=3, type=float)
     parser.add_argument("--seed", type=int)
     args = parser.parse_args()
 
@@ -84,14 +88,16 @@ def main():
 
     seed = random.randint(0, 100000) if args.seed is None else args.seed
     input_image = Image.open(args.input).convert("RGB")
+    sketch_image = Image.open(args.sketch).convert("L")
     width, height = input_image.size
     factor = args.resolution / max(width, height)
     factor = math.ceil(min(width, height) * factor / 64) * 64 / min(width, height)
     width = int((width * factor) // 64) * 64
     height = int((height * factor) // 64) * 64
     input_image = ImageOps.fit(input_image, (width, height), method=Image.Resampling.LANCZOS)
+    sketch_image = ImageOps.fit(sketch_image, (width, height), method=Image.Resampling.LANCZOS)
 
-    if args.edit == "":
+    if args.edit == "": # and sketch is empty
         input_image.save(args.output)
         return
 
@@ -101,10 +107,12 @@ def main():
         input_image = 2 * torch.tensor(np.array(input_image)).float() / 255 - 1
         input_image = rearrange(input_image, "h w c -> 1 c h w").to(model.device)
         cond["c_concat"] = [model.encode_first_stage(input_image).mode()]
+        cond["c_sketch"] = [model.encode_first_stage(sketch_image).mode()]
 
         uncond = {}
         uncond["c_crossattn"] = [null_token]
         uncond["c_concat"] = [torch.zeros_like(cond["c_concat"][0])]
+        uncond["c_sketch"] = [torch.zeros_like(cond["c_sketch"][0])]
 
         sigmas = model_wrap.get_sigmas(args.steps)
 
@@ -113,6 +121,7 @@ def main():
             "uncond": uncond,
             "text_cfg_scale": args.cfg_text,
             "image_cfg_scale": args.cfg_image,
+            "sketch_cfg_scale": args.cfg_sketch,
         }
         torch.manual_seed(seed)
         z = torch.randn_like(cond["c_concat"][0]) * sigmas[0]

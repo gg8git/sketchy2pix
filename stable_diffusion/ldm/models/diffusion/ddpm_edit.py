@@ -696,16 +696,21 @@ class LatentDiffusion(DDPM):
         if bs is not None:
             xc["c_crossattn"] = xc["c_crossattn"][:bs]
             xc["c_concat"] = xc["c_concat"][:bs]
+            xc["c_sketch"] = xc["c_sketch"][:bs]
         cond = {}
 
         # To support classifier-free guidance, randomly drop out only text conditioning 5%, only image conditioning 5%, and both 5%.
         random = torch.rand(x.size(0), device=x.device)
         prompt_mask = rearrange(random < 2 * uncond, "n -> n 1 1")
         input_mask = 1 - rearrange((random >= uncond).float() * (random < 3 * uncond).float(), "n -> n 1 1 1")
+        sketch_mask = 1 - rearrange((random >= uncond).float() * (random < 3 * uncond).float(), "n -> n 1 1 1")
 
         null_prompt = self.get_learned_conditioning([""])
         cond["c_crossattn"] = [torch.where(prompt_mask, null_prompt, self.get_learned_conditioning(xc["c_crossattn"]).detach())]
-        cond["c_concat"] = [input_mask * self.encode_first_stage((xc["c_concat"].to(self.device))).mode().detach()]
+        # cond["c_concat"] = [input_mask * self.encode_first_stage((xc["c_concat"].to(self.device))).mode().detach()]
+        input_encoding = input_mask * self.encode_first_stage((xc["c_concat"].to(self.device))).mode().detach()
+        sketch_encoding = sketch_mask * self.encode_first_stage((xc["c_sketch"].to(self.device))).mode().detach()
+        cond["c_concat"] = [torch.cat([input_encoding, sketch_encoding], dim=1)]
 
         out = [z, cond]
         if return_first_stage_outputs:
