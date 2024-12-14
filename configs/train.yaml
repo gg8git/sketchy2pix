@@ -35,7 +35,7 @@ model:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 32 # unused
-        in_channels: 8
+        in_channels: 12 # prev 8
         out_channels: 4
         model_channels: 320
         attention_resolutions: [ 4, 2, 1 ]
@@ -82,7 +82,7 @@ data:
     train:
       target: edit_dataset.EditDataset
       params:
-        path: data/clip-filtered-dataset
+        path: data/clip-filtered-dataset # change path
         split: train
         min_resize_res: 256
         max_resize_res: 256
@@ -91,7 +91,7 @@ data:
     validation:
       target: edit_dataset.EditDataset
       params:
-        path: data/clip-filtered-dataset
+        path: data/clip-filtered-dataset # change path
         split: val
         min_resize_res: 256
         max_resize_res: 256

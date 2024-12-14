@@ -57,7 +57,7 @@ class EditDataset(Dataset):
 
         image_0 = Image.open(propt_dir.joinpath(f"{seed}_0.jpg"))
         image_1 = Image.open(propt_dir.joinpath(f"{seed}_1.jpg"))
-        sketch = Image.open(propt_dir.joinpath(f"{seed}_0.jpg"))
+        sketch = Image.open(propt_dir.joinpath(f"{seed}_0.jpg")) # change to sketch path
 
         resize_res = torch.randint(self.min_resize_res, self.max_resize_res + 1, ()).item()
         image_0 = image_0.resize((resize_res, resize_res), Image.Resampling.LANCZOS)
