@@ -57,19 +57,22 @@ class EditDataset(Dataset):
 
         image_0 = Image.open(propt_dir.joinpath(f"{seed}_0.jpg"))
         image_1 = Image.open(propt_dir.joinpath(f"{seed}_1.jpg"))
+        sketch = Image.open(propt_dir.joinpath(f"{seed}_0.jpg")) # change to sketch path
 
-        reize_res = torch.randint(self.min_resize_res, self.max_resize_res + 1, ()).item()
-        image_0 = image_0.resize((reize_res, reize_res), Image.Resampling.LANCZOS)
-        image_1 = image_1.resize((reize_res, reize_res), Image.Resampling.LANCZOS)
+        resize_res = torch.randint(self.min_resize_res, self.max_resize_res + 1, ()).item()
+        image_0 = image_0.resize((resize_res, resize_res), Image.Resampling.LANCZOS)
+        image_1 = image_1.resize((resize_res, resize_res), Image.Resampling.LANCZOS)
+        sketch = sketch.resize((resize_res, resize_res), Image.Resampling.LANCZOS)
 
         image_0 = rearrange(2 * torch.tensor(np.array(image_0)).float() / 255 - 1, "h w c -> c h w")
         image_1 = rearrange(2 * torch.tensor(np.array(image_1)).float() / 255 - 1, "h w c -> c h w")
+        sketch = rearrange(2 * torch.tensor(np.array(sketch)).float() / 255 - 1, "h w c -> c h w")
 
         crop = torchvision.transforms.RandomCrop(self.crop_res)
         flip = torchvision.transforms.RandomHorizontalFlip(float(self.flip_prob))
-        image_0, image_1 = flip(crop(torch.cat((image_0, image_1)))).chunk(2)
+        image_0, image_1, sketch = flip(crop(torch.cat((image_0, image_1, sketch)))).chunk(3)
 
-        return dict(edited=image_1, edit=dict(c_concat=image_0, c_crossattn=prompt))
+        return dict(edited=image_1, edit=dict(c_concat=image_0, c_sketch=sketch, c_crossattn=prompt))
 
 
 class EditDatasetEval(Dataset):

@@ -28,7 +28,7 @@ from ldm.models.autoencoder import VQModelInterface, IdentityFirstStage, Autoenc
 from ldm.modules.diffusionmodules.util import make_beta_schedule, extract_into_tensor, noise_like
 from ldm.models.diffusion.ddim import DDIMSampler
 
-## conditioning keys
+
 __conditioning_keys__ = {'concat': 'c_concat',
                          'crossattn': 'c_crossattn',
                          'adm': 'y'}
@@ -324,12 +324,10 @@ class DDPM(pl.LightningModule):
         return loss
 
     def p_losses(self, x_start, t, noise=None):
-        import ipdb; ipdb.set_trace()
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        import ipdb; ipdb.set_trace()
         model_out = self.model(x_noisy, t)
-        import ipdb; ipdb.set_trace()
+
         loss_dict = {}
         if self.parameterization == "eps":
             target = noise
@@ -355,11 +353,9 @@ class DDPM(pl.LightningModule):
         return loss, loss_dict
 
     def forward(self, x, *args, **kwargs):
-        import ipdb; ipdb.set_trace()
         # b, c, h, w, device, img_size, = *x.shape, x.device, self.image_size
         # assert h == img_size and w == img_size, f'height and width of image must be {img_size}'
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
-        import ipdb; ipdb.set_trace()
         return self.p_losses(x, t, *args, **kwargs)
 
     def get_input(self, batch, k):
@@ -700,16 +696,21 @@ class LatentDiffusion(DDPM):
         if bs is not None:
             xc["c_crossattn"] = xc["c_crossattn"][:bs]
             xc["c_concat"] = xc["c_concat"][:bs]
+            xc["c_sketch"] = xc["c_sketch"][:bs]
         cond = {}
 
         # To support classifier-free guidance, randomly drop out only text conditioning 5%, only image conditioning 5%, and both 5%.
         random = torch.rand(x.size(0), device=x.device)
         prompt_mask = rearrange(random < 2 * uncond, "n -> n 1 1")
         input_mask = 1 - rearrange((random >= uncond).float() * (random < 3 * uncond).float(), "n -> n 1 1 1")
+        sketch_mask = 1 - rearrange((random >= uncond).float() * (random < 3 * uncond).float(), "n -> n 1 1 1")
 
         null_prompt = self.get_learned_conditioning([""])
         cond["c_crossattn"] = [torch.where(prompt_mask, null_prompt, self.get_learned_conditioning(xc["c_crossattn"]).detach())]
-        cond["c_concat"] = [input_mask * self.encode_first_stage((xc["c_concat"].to(self.device))).mode().detach()]
+        # cond["c_concat"] = [input_mask * self.encode_first_stage((xc["c_concat"].to(self.device))).mode().detach()]
+        input_encoding = input_mask * self.encode_first_stage((xc["c_concat"].to(self.device))).mode().detach()
+        sketch_encoding = sketch_mask * self.encode_first_stage((xc["c_sketch"].to(self.device))).mode().detach()
+        cond["c_concat"] = [torch.cat([input_encoding, sketch_encoding], dim=1)]
 
         out = [z, cond]
         if return_first_stage_outputs:
@@ -885,7 +886,6 @@ class LatentDiffusion(DDPM):
         return loss
 
     def forward(self, x, c, *args, **kwargs):
-        import ipdb; ipdb.set_trace()
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
         if self.model.conditioning_key is not None:
             assert c is not None
@@ -894,7 +894,6 @@ class LatentDiffusion(DDPM):
             if self.shorten_cond_schedule:  # TODO: drop this option
                 tc = self.cond_ids[t].to(self.device)
                 c = self.q_sample(x_start=c, t=tc, noise=torch.randn_like(c.float()))
-        import ipdb; ipdb.set_trace()
         return self.p_losses(x, c, t, *args, **kwargs)
 
     def _rescale_annotations(self, bboxes, crop_coordinates):  # TODO: move to dataset
@@ -1029,12 +1028,9 @@ class LatentDiffusion(DDPM):
         return mean_flat(kl_prior) / np.log(2.0)
 
     def p_losses(self, x_start, cond, t, noise=None):
-        import ipdb; ipdb.set_trace()
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        import ipdb; ipdb.set_trace()
         model_output = self.apply_model(x_noisy, t, cond)
-        import ipdb; ipdb.set_trace()
 
         loss_dict = {}
         prefix = 'train' if self.training else 'val'
@@ -1064,7 +1060,6 @@ class LatentDiffusion(DDPM):
         loss += (self.original_elbo_weight * loss_vlb)
         loss_dict.update({f'{prefix}/loss': loss})
 
-        import ipdb; ipdb.set_trace()
         return loss, loss_dict
 
     def p_mean_variance(self, x, c, t, clip_denoised: bool, return_codebook_ids=False, quantize_denoised=False,
@@ -1260,7 +1255,7 @@ class LatentDiffusion(DDPM):
         if ddim:
             ddim_sampler = DDIMSampler(self)
             shape = (self.channels, self.image_size, self.image_size)
-            samples, intermediates = ddim_sampler.sample(ddim_steps,batch_size,
+            samples, intermediates =ddim_sampler.sample(ddim_steps,batch_size,
                                                         shape,cond,verbose=False,**kwargs)
 
         else:
