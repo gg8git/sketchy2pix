@@ -27,7 +27,6 @@ class CFGDenoiser(nn.Module):
         self.inner_model = model
 
     def forward(self, z, sigma, cond, uncond, text_cfg_scale, image_cfg_scale):
-        import ipdb; ipdb.set_trace()
         cfg_z = einops.repeat(z, "1 ... -> n ...", n=3)
         cfg_sigma = einops.repeat(sigma, "1 ... -> n ...", n=3)
         cfg_cond = {
@@ -36,7 +35,6 @@ class CFGDenoiser(nn.Module):
         }
         import ipdb; ipdb.set_trace()
         out_cond, out_img_cond, out_uncond = self.inner_model(cfg_z, cfg_sigma, cond=cfg_cond).chunk(3)
-        import ipdb; ipdb.set_trace()
         return out_uncond + text_cfg_scale * (out_cond - out_img_cond) + image_cfg_scale * (out_img_cond - out_uncond)
 
 
@@ -81,7 +79,6 @@ def main():
 
     config = OmegaConf.load(args.config)
     model = load_model_from_config(config, args.ckpt, args.vae_ckpt)  # model = DiffusionWrapper(config, "concat")
-    import ipdb; ipdb.set_trace()
     model.eval().cuda()
     model_wrap = K.external.CompVisDenoiser(model)
     model_wrap_cfg = CFGDenoiser(model_wrap)
@@ -122,11 +119,9 @@ def main():
         torch.manual_seed(seed)
         z = torch.randn_like(cond["c_concat"][0]) * sigmas[0]
         z = K.sampling.sample_euler_ancestral(model_wrap_cfg, z, sigmas, extra_args=extra_args)
-        import ipdb; ipdb.set_trace()
         x = model.decode_first_stage(z)
         x = torch.clamp((x + 1.0) / 2.0, min=0.0, max=1.0)
         x = 255.0 * rearrange(x, "1 c h w -> h w c")
-        import ipdb; ipdb.set_trace()
         edited_image = Image.fromarray(x.type(torch.uint8).cpu().numpy())
     edited_image.save(args.output)
 

@@ -32,7 +32,6 @@ class CFGDenoiser(nn.Module):
         sketch_cat = torch.cat([cond["c_sketch"][0], cond["c_sketch"][0], uncond["c_sketch"][0], uncond["c_sketch"][0]])
         cfg_cond = {
             "c_crossattn": [torch.cat([cond["c_crossattn"][0], uncond["c_crossattn"][0], uncond["c_crossattn"][0], uncond["c_crossattn"][0]])],
-            "c_concat_acc": [torch.cat([cond["c_concat"][0], cond["c_concat"][0], uncond["c_concat"][0]])],
             "c_concat": [torch.cat([input_cat, sketch_cat], dim=1)],
         }
         out_cond, out_sketch_cond, out_img_cond, out_uncond = self.inner_model(cfg_z, cfg_sigma, cond=cfg_cond).chunk(4)
@@ -82,6 +81,7 @@ def main():
 
     config = OmegaConf.load(args.config)
     model = load_model_from_config(config, args.ckpt, args.vae_ckpt)
+    import ipdb; ipdb.set_trace()
     model.eval().cuda()
     model_wrap = K.external.CompVisDenoiser(model)
     model_wrap_cfg = CFGDenoiser(model_wrap)
@@ -89,7 +89,7 @@ def main():
 
     seed = random.randint(0, 100000) if args.seed is None else args.seed
     input_image = Image.open(args.input).convert("RGB")
-    sketch_image = Image.open(args.sketch).convert("L")
+    sketch_image = Image.open(args.sketch).convert("RGB")
     width, height = input_image.size
     factor = args.resolution / max(width, height)
     factor = math.ceil(min(width, height) * factor / 64) * 64 / min(width, height)
@@ -108,6 +108,8 @@ def main():
         input_image = 2 * torch.tensor(np.array(input_image)).float() / 255 - 1
         input_image = rearrange(input_image, "h w c -> 1 c h w").to(model.device)
         cond["c_concat"] = [model.encode_first_stage(input_image).mode()]
+        sketch_image = 2 * torch.tensor(np.array(sketch_image)).float() / 255 - 1
+        sketch_image = rearrange(sketch_image, "h w c -> 1 c h w").to(model.device)
         cond["c_sketch"] = [model.encode_first_stage(sketch_image).mode()]
 
         uncond = {}
@@ -124,6 +126,7 @@ def main():
             "image_cfg_scale": args.cfg_image,
             "sketch_cfg_scale": args.cfg_sketch,
         }
+        import ipdb; ipdb.set_trace()
         torch.manual_seed(seed)
         z = torch.randn_like(cond["c_concat"][0]) * sigmas[0]
         z = K.sampling.sample_euler_ancestral(model_wrap_cfg, z, sigmas, extra_args=extra_args)

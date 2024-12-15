@@ -7,7 +7,7 @@ from tqdm.auto import tqdm
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("dataset_dir")
+    parser.add_argument("--dataset_dir")
     args = parser.parse_args()
     dataset_dir = Path(args.dataset_dir)
 

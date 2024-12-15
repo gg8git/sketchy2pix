@@ -35,7 +35,7 @@ model:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 32 # unused
-        in_channels: 12 # prev 8
+        in_channels: 8
         out_channels: 4
         model_channels: 320
         attention_resolutions: [ 4, 2, 1 ]
@@ -107,7 +107,7 @@ lightning:
         increase_log_steps: False
 
   trainer:
-    max_epochs: 2000
+    max_epochs: 1 #2000 # GENE CHANGED
     benchmark: True
     accumulate_grad_batches: 4
     check_val_every_n_epoch: 4

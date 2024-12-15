@@ -699,11 +699,20 @@ class LatentDiffusion(DDPM):
             xc["c_sketch"] = xc["c_sketch"][:bs]
         cond = {}
 
-        # To support classifier-free guidance, randomly drop out only text conditioning 5%, only image conditioning 5%, and both 5%.
+        # To support classifier-free guidance, randomly drop out:
+        # - only text conditioning (30%)
+        # - only image conditioning (5%)
+        # - only sketch conditioning (5%)
+        # - text + image conditioning (10%)
+        # - text + sketch conditioning (10%)
+        # - image + sketch conditioning (5%)
+        # - all conditioning (5%)
         random = torch.rand(x.size(0), device=x.device)
-        prompt_mask = rearrange(random < 2 * uncond, "n -> n 1 1")
-        input_mask = 1 - rearrange((random >= uncond).float() * (random < 3 * uncond).float(), "n -> n 1 1 1")
-        sketch_mask = 1 - rearrange((random >= uncond).float() * (random < 3 * uncond).float(), "n -> n 1 1 1")
+        prompt_mask = rearrange(random < 11 * uncond, "n -> n 1 1")
+        input_p = (random < 2 * uncond).float() + (random >= 10 * uncond).float() * (random < 13 * uncond).float()
+        input_mask = 1 - rearrange(input_p, "n -> n 1 1 1")
+        sketch_p = (random >= 8 * uncond).float() * (random < 11 * uncond).float() + (random >= 12 * uncond).float() * (random < 14 * uncond).float()
+        sketch_mask = 1 - rearrange(sketch_p, "n -> n 1 1 1")
 
         null_prompt = self.get_learned_conditioning([""])
         cond["c_crossattn"] = [torch.where(prompt_mask, null_prompt, self.get_learned_conditioning(xc["c_crossattn"]).detach())]
@@ -1044,6 +1053,9 @@ class LatentDiffusion(DDPM):
 
         loss_simple = self.get_loss(model_output, target, mean=False).mean([1, 2, 3])
         loss_dict.update({f'{prefix}/loss_simple': loss_simple.mean()})
+
+        # GENE CHANGED
+        self.logvar = self.logvar.to(self.device)
 
         logvar_t = self.logvar[t].to(self.device)
         loss = loss_simple / torch.exp(logvar_t) + logvar_t
