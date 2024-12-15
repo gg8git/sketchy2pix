@@ -77,12 +77,12 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 32
-    num_workers: 2
+    batch_size: 32 # prev 32
+    num_workers: 2 # prev 2
     train:
       target: adapted_edit_dataset.EditDataset
       params:
-        path: /bigdrive/datasets/sketchy2pix/initial
+        path: data/clip-filtered-dataset # /bigdrive/datasets/sketchy2pix/initial
         split: train
         min_resize_res: 256
         max_resize_res: 256
@@ -91,7 +91,7 @@ data:
     validation:
       target: adapted_edit_dataset.EditDataset
       params:
-        path: /bigdrive/datasets/sketchy2pix/initial
+        path: data/clip-filtered-dataset # /bigdrive/datasets/sketchy2pix/initial
         split: val
         min_resize_res: 256
         max_resize_res: 256
@@ -105,18 +105,9 @@ lightning:
         batch_frequency: 2000
         max_images: 2
         increase_log_steps: False
-  model_checkpoint:
-        target: pytorch_lightning.callbacks.ModelCheckpoint
-        params:
-          monitor: val/loss_simple_ema   # Metric to monitor
-          dirpath: checkpoints/          # Directory to save checkpoints
-          filename: "epoch-{epoch:02d}-val_loss-{val/loss_simple_ema:.2f}" # Naming pattern
-          save_top_k: 3                  # Keep top 3 checkpoints
-          mode: min                      # Minimize the monitored metric
-          save_last: true                # Save the latest checkpoint as well
 
   trainer:
-    max_epochs: 5 # 2000
+    max_epochs: 3 # 2000
     benchmark: True
     accumulate_grad_batches: 4
     check_val_every_n_epoch: 4

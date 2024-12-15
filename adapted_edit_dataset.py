@@ -55,9 +55,15 @@ class EditDataset(Dataset):
         with open(propt_dir.joinpath("prompt.json")) as fp:
             prompt = json.load(fp)["edit"]
 
-        image_0 = Image.open(propt_dir.joinpath(f"{seed}_0.png")).convert("RGB")
-        image_1 = Image.open(propt_dir.joinpath(f"{seed}_1.png")).convert("RGB")
-        sketch = Image.open(propt_dir.joinpath(f"{seed}_3.png")).convert("RGB")
+        # our dataset
+        # image_0 = Image.open(propt_dir.joinpath(f"{seed}_0.png")).convert("RGB")
+        # image_1 = Image.open(propt_dir.joinpath(f"{seed}_1.png")).convert("RGB")
+        # sketch = Image.open(propt_dir.joinpath(f"{seed}_3.png")).convert("RGB")
+
+        # original dataset
+        image_0 = Image.open(propt_dir.joinpath(f"{seed}_0.jpg"))
+        image_1 = Image.open(propt_dir.joinpath(f"{seed}_1.jpg"))
+        sketch = Image.open(propt_dir.joinpath(f"{seed}_0.jpg"))
 
         resize_res = torch.randint(self.min_resize_res, self.max_resize_res + 1, ()).item()
         image_0 = image_0.resize((resize_res, resize_res), Image.Resampling.LANCZOS)

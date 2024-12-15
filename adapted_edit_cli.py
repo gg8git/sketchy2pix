@@ -73,9 +73,9 @@ def main():
     parser.add_argument("--sketch", required=True, type=str)
     parser.add_argument("--output", required=True, type=str)
     parser.add_argument("--edit", required=True, type=str)
-    parser.add_argument("--cfg-text", default=12, type=float)
+    parser.add_argument("--cfg-text", default=9, type=float)
     parser.add_argument("--cfg-image", default=1, type=float)
-    parser.add_argument("--cfg-sketch", default=3, type=float)
+    parser.add_argument("--cfg-sketch", default=6, type=float)
     parser.add_argument("--seed", type=int)
     args = parser.parse_args()
 
